@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-
+import os.path
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,8 +31,38 @@ class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        decode_data = self.data.decode('utf-8')
+        # print ("Got a request of: %s\n" % self.data)
+        # self.request.sendall(bytearray("OK",'utf-8'))
+
+        is_get_method = 'GET' in decode_data.split()[0] # True iff is GET methord
+        path = './www' + self.data.split()[1]  # file path
+
+        send_301 = False
+        if (not path.endswith('.css')) and (not path.endswith('.html')):
+            if path.endswith('/'):
+                path += 'index.html'
+            else:
+                send_301 = True
+                path += '/index.html'
+        path_exist = os.path.exists(path) # True iff path file exist
+        #print('Methor is GET: ' + str(is_get_methord) + ' , path is: ' + path + ', file exist status: ' + str(path_exist))
+
+        # begin here
+        if is_get_method:
+            if send_301:
+                self.request.sendall(bytearray('HTTP/1.1 301 Move Permanently\r\n' + path + '\r\n', 'utf-8'))
+            if path_exist:
+                self.request.sendall(bytearray('HTTP/1.1 200 OK\r\n', 'utf-8'))
+                f = open(path, 'r')
+                read = f.read()
+                self.request.sendall(bytearray(read, 'utf-8'))
+            else:
+                self.request.sendall(bytearray('HTTP/1.1 404 Not Found\r\n', 'utf-8'))
+
+        else:
+            self.request.sendall(bytearray('HTTP/1.1 405 Method Not Allowed\r\n', 'utf-8'))
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
@@ -44,3 +74,4 @@ if __name__ == "__main__":
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
     server.serve_forever()
+
